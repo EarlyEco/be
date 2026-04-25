@@ -15,7 +15,11 @@ async def get_current_user(
 ):
     token = credentials.credentials
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(
+            token,
+            secret_key=request.app.state.jwt_signing_secret,
+            algorithm=request.app.state.jwt_algorithm,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

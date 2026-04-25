@@ -3,6 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ASCENDING
 
 from app.core.config import get_settings
+from app.core.jwt_secret_store import ensure_jwt_secret_indexes
 
 
 def create_db_client() -> AsyncIOMotorClient:
@@ -19,6 +20,7 @@ async def ensure_db_indexes(db) -> None:
     await db["users"].create_index([("email", ASCENDING)], unique=True)
     await db["sessions"].create_index([("session_id", ASCENDING)], unique=True)
     await db["sessions"].create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
+    await ensure_jwt_secret_indexes(db)
 
 
 async def close_db_client(client: AsyncIOMotorClient) -> None:

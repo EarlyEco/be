@@ -25,9 +25,9 @@ Optional overrides (otherwise defaults in `app/core/config.py` apply):
 
 - `JWT_ALGORITHM`
 
-For local auth, either add `JWT_SECRET_KEY` to `environment.env` **or** export it in your shell (Vercel should use project env vars instead of committing secrets).
+JWT signing uses `JWT_SECRET_KEY` **if you set it** in the process environment (recommended for production).
 
-The API can start without `JWT_SECRET_KEY`, but `signup`, `signin`, and token validation will not work until it is available to the process.
+If you do not set `JWT_SECRET_KEY`, the server will **generate and store** a random signing secret in Mongo (`app_secrets`) on startup so `signin` can issue tokens without putting secrets in `environment.env`.
 
 4. Run the API:
 
@@ -39,8 +39,8 @@ uvicorn app.main:app --reload
 
 - `GET /api/v1/health` - basic health check
 - `GET /api/v1/health/db` - MongoDB connectivity check
-- `POST /api/v1/auth/signup` - register user and create session token
-- `POST /api/v1/auth/signin` - authenticate user and create session token
+- `POST /api/v1/auth/signup` - register user (email, password, first name, last name; no token)
+- `POST /api/v1/auth/signin` - authenticate user and return Bearer token
 - `GET /api/v1/auth/me` - get current user (requires Bearer token)
 
 ## Deploy on Vercel
@@ -49,9 +49,12 @@ This repo is configured for Vercel Python runtime.
 
 ### Required environment variables in Vercel
 
-- `JWT_SECRET_KEY`
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
+
+### Recommended environment variables in Vercel
+
+- `JWT_SECRET_KEY` (if omitted, a secret is auto-created in Mongo on first boot)
 
 ### Optional environment variables in Vercel
 

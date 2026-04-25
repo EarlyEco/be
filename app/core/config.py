@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     debug: bool = False
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "EarlyEco"
-    jwt_secret_key: str | None = None
     jwt_algorithm: str = "HS256"
     session_timeout_minutes: int = 60
 

@@ -23,24 +23,29 @@ def build_session_expiry() -> datetime:
     return datetime.now(timezone.utc) + timedelta(minutes=settings.session_timeout_minutes)
 
 
-def create_access_token(*, user_id: str, session_id: str, expires_at: datetime) -> str:
-    settings = get_settings()
-    if not settings.jwt_secret_key:
-        raise ValueError("JWT_SECRET_KEY is not configured")
+def create_access_token(
+    *,
+    user_id: str,
+    session_id: str,
+    expires_at: datetime,
+    secret_key: str,
+    algorithm: str,
+) -> str:
+    if not secret_key:
+        raise ValueError("JWT signing secret is not configured")
     payload: dict[str, Any] = {
         "sub": user_id,
         "sid": session_id,
         "exp": expires_at,
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, secret_key, algorithm=algorithm)
 
 
-def decode_access_token(token: str) -> dict[str, Any]:
-    settings = get_settings()
-    if not settings.jwt_secret_key:
-        raise ValueError("JWT_SECRET_KEY is not configured")
+def decode_access_token(token: str, *, secret_key: str, algorithm: str) -> dict[str, Any]:
+    if not secret_key:
+        raise ValueError("JWT signing secret is not configured")
     try:
-        return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(token, secret_key, algorithms=[algorithm])
     except JWTError as exc:
         raise ValueError("Invalid or expired token") from exc
 
