@@ -1,12 +1,21 @@
 from datetime import datetime, timezone
 
 from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.security import build_session_expiry, decode_access_token
 
 bearer_scheme = HTTPBearer(auto_error=True)
+
+
+def as_utc_aware(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 async def get_current_user(
@@ -44,7 +53,7 @@ async def get_current_user(
         )
 
     now = datetime.now(timezone.utc)
-    expires_at = session.get("expires_at")
+    expires_at = as_utc_aware(session.get("expires_at"))
     if not expires_at or expires_at < now:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -57,7 +66,15 @@ async def get_current_user(
         {"$set": {"expires_at": new_expiry, "last_activity_at": now}},
     )
 
-    user = await request.app.state.db["users"].find_one({"_id": ObjectId(user_id)})
+    try:
+        object_id = ObjectId(user_id)
+    except InvalidId as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        ) from exc
+
+    user = await request.app.state.db["users"].find_one({"_id": object_id})
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
