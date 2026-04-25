@@ -25,4 +25,4 @@ uvicorn app.main:app --reload
 ## Endpoints
 
 - `GET /api/v1/health` - basic health check
-- `GET /api/v1/health/db` - database connectivity check
+- `GET /api/v1/health/db` - MongoDB connectivity check

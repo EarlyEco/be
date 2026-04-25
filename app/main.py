@@ -5,16 +5,17 @@ from fastapi import FastAPI
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.db import close_db_pool, create_db_pool
+from app.core.db import close_db_client, create_db_client, get_database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.db_pool = await create_db_pool()
+    app.state.db_client = create_db_client()
+    app.state.db = get_database(app.state.db_client)
     try:
         yield
     finally:
-        await close_db_pool(app.state.db_pool)
+        await close_db_client(app.state.db_client)
 
 
 app = FastAPI(
