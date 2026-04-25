@@ -8,5 +8,4 @@ __pycache__/
 .coverage
 htmlcov/
 environment.env
-secrets.local.env
 Docs/

@@ -10,27 +10,26 @@ Backend app on FastAPI for ealyeco.
 pip install -r requirements.txt
 ```
 
-3. (Optional) add env values:
+3. Create your local `environment.env` from the example:
 
 ```bash
 cp environment.example.env environment.env
 ```
 
-4. Add a JWT signing secret locally (required for auth endpoints; pick one approach):
+Then edit `environment.env` and set real values for:
 
-```bash
-cp secrets.example.env secrets.local.env
-```
+- `MONGODB_URI`
+- `MONGODB_DB_NAME`
 
-Or set it only for your shell session:
+Optional overrides (otherwise defaults in `app/core/config.py` apply):
 
-```bash
-export JWT_SECRET_KEY="replace-with-strong-random-secret"
-```
+- `JWT_ALGORITHM`
 
-The API can start without this, but `signup`, `signin`, and token validation will not work until it is set.
+For local auth, either add `JWT_SECRET_KEY` to `environment.env` **or** export it in your shell (Vercel should use project env vars instead of committing secrets).
 
-5. Run the API:
+The API can start without `JWT_SECRET_KEY`, but `signup`, `signin`, and token validation will not work until it is available to the process.
+
+4. Run the API:
 
 ```bash
 uvicorn app.main:app --reload

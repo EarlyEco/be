@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     session_timeout_minutes: int = 60
 
     model_config = SettingsConfigDict(
-        env_file=("environment.env", "secrets.local.env"),
+        env_file="environment.env",
         env_file_encoding="utf-8",
         extra="ignore",
         env_ignore_empty=True,
