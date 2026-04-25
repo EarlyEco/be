@@ -2,14 +2,16 @@ import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ASCENDING
 
-from app.core.config import settings
+from app.core.config import get_settings
 
 
 def create_db_client() -> AsyncIOMotorClient:
+    settings = get_settings()
     return AsyncIOMotorClient(settings.mongodb_uri, tlsCAFile=certifi.where())
 
 
 def get_database(client: AsyncIOMotorClient):
+    settings = get_settings()
     return client[settings.mongodb_db_name]
 
 

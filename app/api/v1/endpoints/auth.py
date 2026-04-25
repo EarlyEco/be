@@ -4,7 +4,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.dependencies.auth import get_current_user
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.security import (
     build_session_expiry,
     create_access_token,
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/signup", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignUpRequest, request: Request) -> AuthTokenResponse:
+    settings = get_settings()
     users_collection = request.app.state.db["users"]
     sessions_collection = request.app.state.db["sessions"]
 
@@ -49,7 +50,13 @@ async def signup(payload: SignUpRequest, request: Request) -> AuthTokenResponse:
         }
     )
 
-    token = create_access_token(user_id=user_id, session_id=session_id, expires_at=expires_at)
+    try:
+        token = create_access_token(user_id=user_id, session_id=session_id, expires_at=expires_at)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server is missing JWT_SECRET_KEY configuration",
+        ) from exc
     return AuthTokenResponse(
         access_token=token,
         expires_in_seconds=settings.session_timeout_minutes * 60,
@@ -58,6 +65,7 @@ async def signup(payload: SignUpRequest, request: Request) -> AuthTokenResponse:
 
 @router.post("/signin", response_model=AuthTokenResponse)
 async def signin(payload: SignInRequest, request: Request) -> AuthTokenResponse:
+    settings = get_settings()
     users_collection = request.app.state.db["users"]
     sessions_collection = request.app.state.db["sessions"]
 
@@ -81,11 +89,17 @@ async def signin(payload: SignInRequest, request: Request) -> AuthTokenResponse:
         }
     )
 
-    token = create_access_token(
-        user_id=str(user["_id"]),
-        session_id=session_id,
-        expires_at=expires_at,
-    )
+    try:
+        token = create_access_token(
+            user_id=str(user["_id"]),
+            session_id=session_id,
+            expires_at=expires_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server is missing JWT_SECRET_KEY configuration",
+        ) from exc
     return AuthTokenResponse(
         access_token=token,
         expires_in_seconds=settings.session_timeout_minutes * 60,

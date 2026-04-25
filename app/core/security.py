@@ -5,7 +5,7 @@ from uuid import uuid4
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import settings
+from app.core.config import get_settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -19,10 +19,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def build_session_expiry() -> datetime:
+    settings = get_settings()
     return datetime.now(timezone.utc) + timedelta(minutes=settings.session_timeout_minutes)
 
 
 def create_access_token(*, user_id: str, session_id: str, expires_at: datetime) -> str:
+    settings = get_settings()
+    if not settings.jwt_secret_key:
+        raise ValueError("JWT_SECRET_KEY is not configured")
     payload: dict[str, Any] = {
         "sub": user_id,
         "sid": session_id,
@@ -32,6 +36,9 @@ def create_access_token(*, user_id: str, session_id: str, expires_at: datetime) 
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
+    settings = get_settings()
+    if not settings.jwt_secret_key:
+        raise ValueError("JWT_SECRET_KEY is not configured")
     try:
         return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except JWTError as exc:

@@ -3,8 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.db import close_db_client, create_db_client, ensure_db_indexes, get_database
+
+settings = get_settings()
 
 
 @asynccontextmanager
