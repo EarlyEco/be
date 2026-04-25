@@ -1,0 +1,63 @@
+from datetime import datetime, timezone
+
+from bson import ObjectId
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.core.security import build_session_expiry, decode_access_token
+
+bearer_scheme = HTTPBearer(auto_error=True)
+
+
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+):
+    token = credentials.credentials
+    try:
+        payload = decode_access_token(token)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        ) from exc
+
+    user_id = payload.get("sub")
+    session_id = payload.get("sid")
+    if not user_id or not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    session = await request.app.state.db["sessions"].find_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session not found",
+        )
+
+    now = datetime.now(timezone.utc)
+    expires_at = session.get("expires_at")
+    if not expires_at or expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired",
+        )
+
+    new_expiry = build_session_expiry()
+    await request.app.state.db["sessions"].update_one(
+        {"_id": session["_id"]},
+        {"$set": {"expires_at": new_expiry, "last_activity_at": now}},
+    )
+
+    user = await request.app.state.db["users"].find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    user["id"] = str(user["_id"])
+    return user

@@ -7,13 +7,13 @@ Backend app on FastAPI for ealyeco.
 2. Install dependencies:
 
 ```bash
-pip install -r app/requirements.txt
+pip install -r requirements.txt
 ```
 
 3. (Optional) add env values:
 
 ```bash
-cp .env.example .env
+cp .env.example environment.env
 ```
 
 4. Run the API:
@@ -26,6 +26,9 @@ uvicorn app.main:app --reload
 
 - `GET /api/v1/health` - basic health check
 - `GET /api/v1/health/db` - MongoDB connectivity check
+- `POST /api/v1/auth/signup` - register user and create session token
+- `POST /api/v1/auth/signin` - authenticate user and create session token
+- `GET /api/v1/auth/me` - get current user (requires Bearer token)
 
 ## Deploy on Vercel
 

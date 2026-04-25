@@ -7,6 +7,5 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
-.env
 environment.env
 Docs/

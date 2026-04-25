@@ -7,9 +7,12 @@ class Settings(BaseSettings):
     debug: bool = True
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "EarlyEco"
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    session_timeout_minutes: int = 60
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="environment.env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
