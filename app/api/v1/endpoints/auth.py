@@ -4,7 +4,6 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.dependencies.auth import get_current_user
-from app.core.config import get_settings
 from app.core.security import (
     build_session_expiry,
     create_access_token,
@@ -48,7 +47,7 @@ async def signup(payload: SignUpRequest, request: Request) -> UserResponse:
 
 @router.post("/signin", response_model=AuthTokenResponse)
 async def signin(payload: SignInRequest, request: Request) -> AuthTokenResponse:
-    settings = get_settings()
+    settings = request.app.state.settings
     users_collection = request.app.state.db["users"]
     sessions_collection = request.app.state.db["sessions"]
 
@@ -61,7 +60,7 @@ async def signin(payload: SignInRequest, request: Request) -> AuthTokenResponse:
 
     now = datetime.now(timezone.utc)
     session_id = new_session_id()
-    expires_at = build_session_expiry()
+    expires_at = build_session_expiry(session_timeout_minutes=settings.session_timeout_minutes)
     await sessions_collection.insert_one(
         {
             "session_id": session_id,

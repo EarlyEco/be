@@ -60,7 +60,9 @@ async def get_current_user(
             detail="Session expired",
         )
 
-    new_expiry = build_session_expiry()
+    new_expiry = build_session_expiry(
+        session_timeout_minutes=request.app.state.settings.session_timeout_minutes,
+    )
     await request.app.state.db["sessions"].update_one(
         {"_id": session["_id"]},
         {"$set": {"expires_at": new_expiry, "last_activity_at": now}},

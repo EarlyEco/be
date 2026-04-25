@@ -5,8 +5,6 @@ from uuid import uuid4
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import get_settings
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -18,9 +16,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def build_session_expiry() -> datetime:
-    settings = get_settings()
-    return datetime.now(timezone.utc) + timedelta(minutes=settings.session_timeout_minutes)
+def build_session_expiry(*, session_timeout_minutes: int) -> datetime:
+    return datetime.now(timezone.utc) + timedelta(minutes=session_timeout_minutes)
 
 
 def create_access_token(

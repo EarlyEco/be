@@ -1,5 +1,4 @@
-from functools import lru_cache
-
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +19,15 @@ class Settings(BaseSettings):
     )
 
 
-@lru_cache
+def try_load_settings() -> Settings | None:
+    try:
+        return Settings()
+    except ValidationError:
+        return None
+
+
 def get_settings() -> Settings:
-    return Settings()
+    settings = try_load_settings()
+    if not settings:
+        raise RuntimeError("Missing required configuration (set MONGODB_URI and MONGODB_DB_NAME).")
+    return settings
