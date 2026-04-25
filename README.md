@@ -26,3 +26,5 @@ uvicorn app.main:app --reload
 
 - `GET /api/v1/health` - basic health check
 - `GET /api/v1/health/db` - MongoDB connectivity check
+
+hi
