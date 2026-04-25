@@ -27,4 +27,21 @@ uvicorn app.main:app --reload
 - `GET /api/v1/health` - basic health check
 - `GET /api/v1/health/db` - MongoDB connectivity check
 
-hi
+## Deploy on Vercel
+
+This repo is configured for Vercel Python runtime.
+
+### Required environment variables in Vercel
+
+- `APP_NAME`
+- `APP_VERSION`
+- `DEBUG`
+- `MONGODB_URI`
+- `MONGODB_DB_NAME`
+
+### Deploy steps
+
+1. Push code to GitHub.
+2. Import the repo in Vercel.
+3. Add the environment variables in Vercel project settings.
+4. Deploy.
