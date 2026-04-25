@@ -27,11 +27,13 @@ async def signup(payload: SignUpRequest, request: Request) -> UserResponse:
     now = datetime.now(timezone.utc)
     first_name = payload.first_name.strip()
     last_name = payload.last_name.strip()
+    permanent_address = payload.permanent_address.strip()
     user_data = {
         "email": payload.email.lower(),
         "password_hash": hash_password(payload.password),
         "first_name": first_name,
         "last_name": last_name,
+        "permanent_address": permanent_address,
         "created_at": now,
         "updated_at": now,
     }
@@ -42,6 +44,7 @@ async def signup(payload: SignUpRequest, request: Request) -> UserResponse:
         email=payload.email.lower(),
         first_name=first_name,
         last_name=last_name,
+        permanent_address=permanent_address,
     )
 
 
@@ -91,4 +94,5 @@ async def me(current_user=Depends(get_current_user)) -> UserResponse:
         email=current_user["email"],
         first_name=current_user.get("first_name", ""),
         last_name=current_user.get("last_name", ""),
+        permanent_address=current_user.get("permanent_address", ""),
     )

@@ -6,6 +6,7 @@ class SignUpRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
+    permanent_address: str = Field(min_length=5, max_length=500)
 
 
 class SignInRequest(BaseModel):
@@ -24,3 +25,4 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    permanent_address: str

@@ -39,7 +39,7 @@ uvicorn app.main:app --reload
 
 - `GET /api/v1/health` - basic health check
 - `GET /api/v1/health/db` - MongoDB connectivity check
-- `POST /api/v1/auth/signup` - register user (email, password, first name, last name; no token)
+- `POST /api/v1/auth/signup` - register user (email, password, first name, last name, permanent address; no token)
 - `POST /api/v1/auth/signin` - authenticate user and return Bearer token
 - `GET /api/v1/auth/me` - get current user (requires Bearer token)
 
