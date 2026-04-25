@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 
-import uvicorn
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
@@ -24,5 +23,12 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan,
 )
+
+
+@app.get("/", summary="Service status")
+def root_status() -> dict[str, str]:
+    return {"status": "ok", "message": settings.app_name}
+
+
 app.include_router(api_router, prefix="/api/v1")
 
