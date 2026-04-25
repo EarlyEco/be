@@ -52,6 +52,8 @@ This repo is configured for Vercel Python runtime.
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
 
+`environment.env` is for local development only (it is not deployed to Vercel). You must set the Mongo variables in the Vercel dashboard for each environment you deploy to (Production **and** Preview, if you use preview URLs).
+
 ### Recommended environment variables in Vercel
 
 - `JWT_SECRET_KEY` (if omitted, a secret is auto-created in Mongo on first boot)

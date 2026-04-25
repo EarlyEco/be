@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     app_name: str = "EarlyEco API"
     app_version: str = "0.1.0"
     debug: bool = False
-    mongodb_uri: str = "mongodb://localhost:27017"
-    mongodb_db_name: str = "EarlyEco"
+    mongodb_uri: str
+    mongodb_db_name: str
     jwt_algorithm: str = "HS256"
     session_timeout_minutes: int = 60
 
