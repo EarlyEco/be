@@ -5,9 +5,7 @@ from datetime import datetime, timedelta, timezone
 import math
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-
-from app.api.dependencies.auth import get_current_user
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from app.schemas.community_health import (
     CommunityHealthResponse,
     CommunityRiskBreakdown,
@@ -28,7 +26,6 @@ def _warning_level_from_ratio(unhealthy_ratio: float, avg_risk_score: float | No
 @router.get("/overview", response_model=CommunityHealthResponse)
 async def get_community_health_overview(
     request: Request,
-    current_user=Depends(get_current_user),
     city: str | None = Query(default=None),
     latitude: float | None = Query(default=None, ge=-90, le=90),
     longitude: float | None = Query(default=None, ge=-180, le=180),
