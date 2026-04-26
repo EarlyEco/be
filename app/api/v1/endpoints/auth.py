@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.api.dependencies.auth import get_current_user
 from app.core.security import (
     build_session_expiry,
     create_access_token,
+    decode_access_token,
     hash_password,
     new_session_id,
     verify_password,
@@ -96,3 +97,37 @@ async def me(current_user=Depends(get_current_user)) -> UserResponse:
         last_name=current_user.get("last_name", ""),
         permanent_address=current_user.get("permanent_address", ""),
     )
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    token: str = Query(..., min_length=20, max_length=5000),
+):
+    try:
+        payload = decode_access_token(
+            token,
+            secret_key=request.app.state.jwt_signing_secret,
+            algorithm=request.app.state.jwt_algorithm,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        ) from exc
+
+    user_id = payload.get("sub")
+    session_id = payload.get("sid")
+    if not user_id or not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    delete_result = await request.app.state.db["sessions"].delete_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
+    if delete_result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    return {"status": "ok", "message": "Logged out successfully"}
