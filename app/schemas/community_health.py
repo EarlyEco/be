@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 class CommunityRiskBreakdown(BaseModel):
@@ -30,3 +32,19 @@ class CommunityHealthResponse(BaseModel):
     top_symptoms: list[str]
     warning_level: str
     warnings: list[CommunityWarning]
+    # Map pins (grid-clustered, approximate centers). UI may merge any non-empty array below.
+    hotspots: list[dict[str, Any]] = Field(default_factory=list)
+    risk_hotspots: list[dict[str, Any]] = Field(default_factory=list)
+    location_hotspots: list[dict[str, Any]] = Field(default_factory=list)
+    map_hotspots: list[dict[str, Any]] = Field(default_factory=list)
+    anonymized_locations: list[dict[str, Any]] = Field(default_factory=list)
+    anonymous_locations: list[dict[str, Any]] = Field(default_factory=list)
+    report_locations: list[dict[str, Any]] = Field(default_factory=list)
+    location_clusters: list[dict[str, Any]] = Field(default_factory=list)
+    clusters: list[dict[str, Any]] = Field(default_factory=list)
+    peer_locations: list[dict[str, Any]] = Field(default_factory=list)
+    check_in_locations: list[dict[str, Any]] = Field(default_factory=list)
+    map_points: list[dict[str, Any]] = Field(default_factory=list)
+    recent_location_pins: list[dict[str, Any]] = Field(default_factory=list)
+    geojson: dict[str, Any] | None = None
+    geo_json: dict[str, Any] | None = None

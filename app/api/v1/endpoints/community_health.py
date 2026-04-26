@@ -6,11 +6,14 @@ import math
 import re
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
+
+from app.core.community_hotspots import cluster_docs_to_hotspots, hotspots_to_geojson
 from app.schemas.community_health import (
     CommunityHealthResponse,
     CommunityRiskBreakdown,
     CommunityWarning,
 )
+from app.schemas.community_map import CommunityMapPointsResponse
 
 router = APIRouter(prefix="/community-health", tags=["community-health"])
 
@@ -33,16 +36,16 @@ def _warning_level_from_ratio(unhealthy_ratio: float, avg_risk_score: float | No
     return "info"
 
 
-@router.get("/overview", response_model=CommunityHealthResponse)
-async def get_community_health_overview(
-    request: Request,
-    city: str | None = Query(default=None),
-    latitude: float | None = Query(default=None, ge=-90, le=90),
-    longitude: float | None = Query(default=None, ge=-180, le=180),
-    radius_km: float = Query(default=5.0, ge=0.1, le=200),
-    lookback_hours: int = Query(default=24, ge=1, le=720),
-) -> CommunityHealthResponse:
-    city = _effective_city(city)
+async def _fetch_community_docs(
+    db,
+    *,
+    city: str | None,
+    latitude: float | None,
+    longitude: float | None,
+    radius_km: float,
+    lookback_hours: int,
+) -> tuple[list[dict], str, str, bool, bool]:
+    """Returns (docs, location_mode, location_label, used_full_history_fallback, used_address_fallback)."""
     since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     query: dict = {"recorded_at": {"$gte": since}}
     location_mode = "global"
@@ -68,15 +71,13 @@ async def get_community_health_overview(
         query["latitude"] = {"$gte": float(latitude) - lat_delta, "$lte": float(latitude) + lat_delta}
         query["longitude"] = {"$gte": float(longitude) - lon_delta, "$lte": float(longitude) + lon_delta}
 
-    docs = await request.app.state.db["health_checkins"].find(query).sort("recorded_at", -1).limit(5000).to_list(5000)
+    docs = await db["health_checkins"].find(query).sort("recorded_at", -1).limit(5000).to_list(5000)
     used_full_history_fallback = False
     used_address_fallback = False
 
-    # If city-specific check-ins are not tagged with that city, fall back to users
-    # whose permanent address matches the city and aggregate their check-ins.
     if not docs and city:
         city_regex = {"$regex": re.escape(city.strip()), "$options": "i"}
-        matching_users = await request.app.state.db["users"].find(
+        matching_users = await db["users"].find(
             {"permanent_address": city_regex},
             {"_id": 1},
         ).to_list(100000)
@@ -84,7 +85,7 @@ async def get_community_health_overview(
         if user_ids:
             address_query = {"user_id": {"$in": user_ids}, "recorded_at": {"$gte": since}}
             docs = (
-                await request.app.state.db["health_checkins"]
+                await db["health_checkins"]
                 .find(address_query)
                 .sort("recorded_at", -1)
                 .limit(5000)
@@ -96,7 +97,7 @@ async def get_community_health_overview(
         fallback_query = dict(query)
         fallback_query.pop("recorded_at", None)
         docs = (
-            await request.app.state.db["health_checkins"]
+            await db["health_checkins"]
             .find(fallback_query)
             .sort("recorded_at", -1)
             .limit(5000)
@@ -104,13 +105,56 @@ async def get_community_health_overview(
         )
         used_full_history_fallback = bool(docs)
 
+    return docs, location_mode, location_label, used_full_history_fallback, used_address_fallback
+
+
+def _pin_arrays(pins: list[dict]) -> dict:
+    """Same pin list under every key the UI may merge."""
+    return {
+        "hotspots": pins,
+        "risk_hotspots": pins,
+        "location_hotspots": pins,
+        "map_hotspots": pins,
+        "anonymized_locations": pins,
+        "anonymous_locations": pins,
+        "report_locations": pins,
+        "location_clusters": pins,
+        "clusters": pins,
+        "peer_locations": pins,
+        "check_in_locations": pins,
+        "map_points": pins,
+        "recent_location_pins": pins,
+    }
+
+
+@router.get("/overview", response_model=CommunityHealthResponse)
+async def get_community_health_overview(
+    request: Request,
+    city: str | None = Query(default=None),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float = Query(default=5.0, ge=0.1, le=200),
+    lookback_hours: int = Query(default=24, ge=1, le=720),
+) -> CommunityHealthResponse:
+    city = _effective_city(city)
+    db = request.app.state.db
+    docs, location_mode, location_label, used_full_history_fallback, used_address_fallback = (
+        await _fetch_community_docs(
+            db,
+            city=city,
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=radius_km,
+            lookback_hours=lookback_hours,
+        )
+    )
+
     if not docs:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No community health records found for selected location/time.",
         )
 
-    db = request.app.state.db
     registered_users_count = await db["users"].count_documents({})
 
     total = len(docs)
@@ -196,6 +240,10 @@ async def get_community_health_overview(
             )
         )
 
+    pins = cluster_docs_to_hotspots(docs)
+    gj = hotspots_to_geojson(pins) if pins else {"type": "FeatureCollection", "features": []}
+    pin_kw = _pin_arrays(pins)
+
     return CommunityHealthResponse(
         location_mode=location_mode,
         location_label=location_label,
@@ -214,4 +262,35 @@ async def get_community_health_overview(
         top_symptoms=top_symptoms,
         warning_level=warning_level,
         warnings=warnings,
+        geojson=gj,
+        geo_json=gj,
+        **pin_kw,
     )
+
+
+@router.get("/map-points", response_model=CommunityMapPointsResponse)
+async def get_community_map_points(
+    request: Request,
+    city: str | None = Query(default=None),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float = Query(default=5.0, ge=0.1, le=200),
+    lookback_hours: int = Query(default=24, ge=1, le=720),
+) -> CommunityMapPointsResponse:
+    city = _effective_city(city)
+    db = request.app.state.db
+    docs, _, _, _, _ = await _fetch_community_docs(
+        db,
+        city=city,
+        latitude=latitude,
+        longitude=longitude,
+        radius_km=radius_km,
+        lookback_hours=lookback_hours,
+    )
+    if not docs:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No community health records found for selected location/time.",
+        )
+    pins = cluster_docs_to_hotspots(docs)
+    return CommunityMapPointsResponse(points=pins, hotspots=pins, locations=pins)
