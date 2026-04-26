@@ -5,6 +5,7 @@ class CommunityRiskBreakdown(BaseModel):
     low: int
     moderate: int
     high: int
+    unknown: int = 0
 
 
 class CommunityWarning(BaseModel):
@@ -18,7 +19,11 @@ class CommunityHealthResponse(BaseModel):
     location_label: str
     lookback_hours: int
     total_reports: int
+    unique_users: int
+    registered_users_count: int
+    healthy_reports: int
     unhealthy_reports: int
+    pending_reports: int
     unhealthy_ratio: float
     average_risk_score: float | None
     risk_breakdown: CommunityRiskBreakdown

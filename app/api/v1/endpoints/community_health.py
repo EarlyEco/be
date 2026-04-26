@@ -15,6 +15,16 @@ from app.schemas.community_health import (
 router = APIRouter(prefix="/community-health", tags=["community-health"])
 
 
+def _effective_city(city: str | None) -> str | None:
+    """Treat UI placeholder strings as 'no city filter' (global community view)."""
+    if not city or not str(city).strip():
+        return None
+    normalized = str(city).strip().lower().replace("+", " ")
+    if normalized in {"current location", "my location", "unknown", "here", "all"}:
+        return None
+    return str(city).strip()
+
+
 def _warning_level_from_ratio(unhealthy_ratio: float, avg_risk_score: float | None) -> str:
     if unhealthy_ratio >= 0.45 or (avg_risk_score is not None and avg_risk_score >= 70):
         return "critical"
@@ -32,6 +42,7 @@ async def get_community_health_overview(
     radius_km: float = Query(default=5.0, ge=0.1, le=200),
     lookback_hours: int = Query(default=24, ge=1, le=720),
 ) -> CommunityHealthResponse:
+    city = _effective_city(city)
     since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     query: dict = {"recorded_at": {"$gte": since}}
     location_mode = "global"
@@ -99,15 +110,26 @@ async def get_community_health_overview(
             detail="No community health records found for selected location/time.",
         )
 
+    db = request.app.state.db
+    registered_users_count = await db["users"].count_documents({})
+
     total = len(docs)
+    user_ids_in_sample = {str(d["user_id"]) for d in docs if d.get("user_id") is not None}
+    unique_users = len(user_ids_in_sample)
+
+    healthy = sum(1 for d in docs if d.get("is_healthy") is True)
     unhealthy = sum(1 for d in docs if d.get("is_healthy") is False)
-    unhealthy_ratio = unhealthy / total if total else 0.0
+    pending = total - healthy - unhealthy
+    assessed = healthy + unhealthy
+    unhealthy_ratio = (unhealthy / assessed) if assessed else 0.0
+
     numeric_scores = [int(d["risk_score"]) for d in docs if isinstance(d.get("risk_score"), int)]
     avg_risk = round(sum(numeric_scores) / len(numeric_scores), 2) if numeric_scores else None
 
     low = sum(1 for d in docs if d.get("risk_level") == "low")
     moderate = sum(1 for d in docs if d.get("risk_level") == "moderate")
     high = sum(1 for d in docs if d.get("risk_level") == "high")
+    unknown_risk = total - low - moderate - high
 
     symptom_counter: Counter[str] = Counter()
     for doc in docs:
@@ -116,14 +138,22 @@ async def get_community_health_overview(
 
     warning_level = _warning_level_from_ratio(unhealthy_ratio, avg_risk)
     warnings: list[CommunityWarning] = []
+    if pending > 0:
+        warnings.append(
+            CommunityWarning(
+                severity="info",
+                title="Some check-ins are still pending assessment",
+                detail=f"{pending} of {total} reports do not have a completed health assessment yet.",
+            )
+        )
     if warning_level != "info":
         warnings.append(
             CommunityWarning(
                 severity=warning_level,
                 title="Elevated community health risk",
                 detail=(
-                    f"{unhealthy} of {total} reports are currently unhealthy "
-                    f"({round(unhealthy_ratio * 100, 1)}%)."
+                    f"{unhealthy} of {assessed or total} assessed reports are unhealthy "
+                    f"({round(unhealthy_ratio * 100, 1)}% among assessed)."
                 ),
             )
         )
@@ -171,10 +201,16 @@ async def get_community_health_overview(
         location_label=location_label,
         lookback_hours=lookback_hours,
         total_reports=total,
+        unique_users=unique_users,
+        registered_users_count=registered_users_count,
+        healthy_reports=healthy,
         unhealthy_reports=unhealthy,
+        pending_reports=pending,
         unhealthy_ratio=round(unhealthy_ratio, 4),
         average_risk_score=avg_risk,
-        risk_breakdown=CommunityRiskBreakdown(low=low, moderate=moderate, high=high),
+        risk_breakdown=CommunityRiskBreakdown(
+            low=low, moderate=moderate, high=high, unknown=max(0, unknown_risk)
+        ),
         top_symptoms=top_symptoms,
         warning_level=warning_level,
         warnings=warnings,
