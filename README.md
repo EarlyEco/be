@@ -50,6 +50,14 @@ uvicorn app.main:app --reload
 - `GET /api/v1/users/self/health-suggestions` - get future outlook, warnings (`info`/`warning`/`critical`), and precaution suggestions (requires Bearer token)
 - `POST /api/v1/mock-data/users/health-checkins/generate` - generate synthetic check-ins using query params: `email`, `start_date`, `end_date`, `frequency`
 
+## Automatic mock population job
+
+The API runs an internal background job (Celery-like loop) every 15 minutes.
+For each user in `users`, it automatically creates one new mock health check-in in `health_checkins`:
+- keeps the user's latest known location unchanged
+- generates mock health values for the rest
+- runs assessment/classification and stores results
+
 ## Deploy on Vercel
 
 This repo is configured for Vercel Python runtime.

@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+import asyncio
 import os
 
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.api.v1.router import api_router
+from app.core.auto_mock_population import auto_population_loop
 from app.core.config import try_load_settings
 from app.core.db import close_db_client, create_db_client, ensure_db_indexes, get_database
 from app.core.jwt_secret_store import get_or_create_jwt_secret
@@ -38,9 +40,15 @@ async def lifespan(app: FastAPI):
     app.title = settings.app_name
     app.version = settings.app_version
     app.debug = settings.debug
+    app.state.auto_population_task = asyncio.create_task(auto_population_loop(app))
     try:
         yield
     finally:
+        task = getattr(app.state, "auto_population_task", None)
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         if app.state.db_client is not None:
             await close_db_client(app.state.db_client)
 
