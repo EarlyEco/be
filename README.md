@@ -49,6 +49,7 @@ uvicorn app.main:app --reload
 - `GET /api/v1/users/self/health-checkins/trend` - view personal health trend from assessed check-ins (requires Bearer token)
 - `GET /api/v1/users/self/health-checkins/{checkin_id}` - fetch one check-in (requires Bearer token)
 - `GET /api/v1/users/self/health-suggestions` - get future outlook, warnings (`info`/`warning`/`critical`), and precaution suggestions (requires Bearer token)
+- `GET /api/v1/community-health/overview` - view surrounding/community health by city or lat/lon radius (requires Bearer token)
 - `POST /api/v1/mock-data/users/health-checkins/generate` - generate synthetic check-ins using query params: `email`, `start_date`, `end_date`, `frequency`
 
 ## Automatic mock population job

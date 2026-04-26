@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.community_health import router as community_health_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.mock_data import router as mock_data_router
 from app.api.v1.endpoints.suggestions import router as suggestions_router
@@ -12,3 +13,4 @@ api_router.include_router(auth_router)
 api_router.include_router(user_health_router)
 api_router.include_router(mock_data_router)
 api_router.include_router(suggestions_router)
+api_router.include_router(community_health_router)

@@ -21,6 +21,8 @@ async def ensure_db_indexes(db) -> None:
     await db["sessions"].create_index([("session_id", ASCENDING)], unique=True)
     await db["sessions"].create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
     await db["health_checkins"].create_index([("user_id", ASCENDING), ("recorded_at", DESCENDING)])
+    await db["health_checkins"].create_index([("city", ASCENDING), ("recorded_at", DESCENDING)])
+    await db["health_checkins"].create_index([("latitude", ASCENDING), ("longitude", ASCENDING), ("recorded_at", DESCENDING)])
     await ensure_jwt_secret_indexes(db)
 
 
