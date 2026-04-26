@@ -1,177 +1,82 @@
 # EarlyEco Backend (`be`)
 
-FastAPI backend for participatory health surveillance and risk intelligence.
+EarlyEco Backend is a FastAPI service for participatory health intelligence, built to collect frequent user health check-ins, assess individual risk, and generate actionable insights at both user and community levels. The system supports authentication, session management, health trend tracking, warning/suggestion generation, community-location risk summaries, and synthetic data generation for demo/testing workflows.
 
-This service supports:
-- User auth and session management
-- Frequent user health check-ins (manual now, auto-ready later)
-- Per-user risk classification and trends
-- Health suggestions with warnings and future outlook
-- Community-level health metrics by location
-- Mock data generation and scheduled auto-population jobs
+## Replicate Locally
 
-## Tech Stack
+1. Clone and enter project:
 
-- Python + FastAPI
-- MongoDB Atlas (Motor async client)
-- JWT auth with session records
-- Optional LLM-assisted classification (`LLM_API_KEY`)
+```bash
+git clone <your-repo-url>
+cd be
+```
 
-## Project Structure
+2. Create and activate virtual environment:
 
-- `app/main.py` - app bootstrap, lifespan, middleware, background jobs
-- `app/api/v1/endpoints/` - API route sections (`auth`, `user_health`, `community_health`, `suggestions`, `mock_data`, `health`)
-- `app/core/` - config, DB setup, security, assessment logic, auto-population loop
-- `app/schemas/` - Pydantic request/response models
-- `api/index.py` - Vercel entrypoint
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
-## Local Setup
-
-1) Create and activate a virtual environment.
-
-2) Install dependencies:
+3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3) Prepare environment file:
+4. Create local environment file:
 
 ```bash
 cp environment.example.env environment.env
 ```
 
-4) Update `environment.env` with real values:
-
+5. Update `environment.env` with real values:
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
 - optional: `JWT_ALGORITHM`
-- optional: `LLM_API_KEY` (for LLM-based assessment path)
+- optional: `LLM_API_KEY`
 
-5) Run API:
+6. Run server:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 ```
 
-6) Open docs:
-- Swagger UI: `http://localhost:8080/docs`
-- OpenAPI JSON: `http://localhost:8080/openapi.json`
+7. Open:
+- `http://127.0.0.1:8080/docs`
+- `http://127.0.0.1:8080/openapi.json`
 
-## Authentication Flow
+## Project Info
 
-1) `POST /api/v1/auth/signup`  
-Create account (no token issued).
+### Main Features
+- Auth with session-based JWT flow
+- User health check-ins (location + symptoms + vitals + wellness)
+- Risk classification and trend analysis
+- Suggestions with warnings and future outlook
+- Community health overview by city or nearby radius
+- Mock-data generation and automatic 15-minute population loop
 
-2) `POST /api/v1/auth/signin`  
-Returns Bearer token and starts session.
+### Stack
+- FastAPI
+- MongoDB Atlas (Motor/PyMongo)
+- JWT auth
+- Optional LLM-assisted health assessment
 
-3) Use token in protected calls:
+### Important Files
+- `app/main.py` - app startup, middleware, background loop
+- `app/api/v1/endpoints/` - API sections (`auth`, `user_health`, `community_health`, `suggestions`, `mock_data`, `health`)
+- `app/core/` - config, db, security, assessment, auto-population
+- `app/schemas/` - API request/response models
+- `api/index.py` - Vercel entrypoint
 
-`Authorization: Bearer <access_token>`
+## Deployment (Vercel)
 
-4) `POST /api/v1/auth/logout?token=<access_token>`  
-Closes session tied to that token.
-
-## API Sections
-
-### Health
-- `GET /api/v1/health`
-- `GET /api/v1/health/db`
-
-### Auth
-- `POST /api/v1/auth/signup`
-- `POST /api/v1/auth/signin`
-- `POST /api/v1/auth/logout` (token in query param)
-- `GET /api/v1/auth/me`
-
-### User Health
-- `POST /api/v1/users/self/health-checkins`
-- `GET /api/v1/users/self/health-checkins/latest`
-- `GET /api/v1/users/self/health-checkins`
-- `GET /api/v1/users/self/health-checkins/{checkin_id}`
-- `GET /api/v1/users/self/health-checkins/trend`
-
-Check-ins store rich health context (location, vitals, symptom severity, exposure, wellness, testing, medications, chronic conditions) plus classification output:
-- `is_healthy`
-- `risk_score`, `risk_level`
-- `classification` (granular dimensions)
-- `assessment_summary`, `assessed_at`, `assessment_model`
-
-### Suggestions
-- `GET /api/v1/users/self/health-suggestions`
-
-Returns:
-- Multi-horizon predictions (6h/24h/72h)
-- Likely condition patterns with probabilities
-- Risk drivers
-- Severity-classified warnings (`info`, `warning`, `critical`)
-- Actionable precautions
-
-### Community Health
-- `GET /api/v1/community-health/overview`
-
-Supports:
-- Generic/global metrics (no location params)
-- City-based metrics (`city=...`, partial match supported)
-- Radius-based metrics (`latitude`, `longitude`, `radius_km`)
-- Lookback filtering (`lookback_hours`)
-
-Returns only aggregated community metrics (no individual records).
-
-### Mock Data
-- `POST /api/v1/mock-data/users/health-checkins/generate`
-
-Query params:
-- `email`
-- `start_date`
-- `end_date`
-- `frequency`
-
-Generates and stores synthetic check-ins in the selected interval/range.
-
-## Background Auto-Population Job
-
-The app runs an internal scheduler loop (Celery-like behavior) every 15 minutes:
-- iterates all users
-- generates one new mock check-in per user
-- preserves latest known user location
-- mocks other health fields
-- runs and stores risk assessment/classification
-
-## MongoDB Notes
-
-The app creates indexes for:
-- users/sessions auth flows
-- health check-in trend and community queries
-- secret storage metadata
-
-To clear data without dropping collections/indexes (mongosh):
-
-```javascript
-use EarlyEco
-db.getCollectionNames().forEach((c) => db.getCollection(c).deleteMany({}))
-```
-
-## Vercel Deployment
-
-Configured for Vercel Python runtime via `vercel.json`.
-
-### Required Vercel env vars
+Required env vars:
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
 
-### Optional
-- `DEBUG` (default `false`)
+Optional:
+- `DEBUG`
 - `LLM_API_KEY`
 
-`environment.env` is local only; Vercel does not read your local file.
-
-## Known Behavior
-
-- If required DB config is missing, API routes return a clear misconfiguration response.
-- Community endpoint falls back intelligently (city field match, address match, history fallback) before returning no-data.
-
-## License / Usage
-
-Internal hackathon prototype backend for EarlyEco use-case.
+Note: `environment.env` is local-only. Configure env vars in Vercel dashboard.
