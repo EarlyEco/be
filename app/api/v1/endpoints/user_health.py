@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.api.dependencies.auth import get_current_user
 from app.core.health_assessment import assess_and_store_checkin
@@ -88,6 +88,8 @@ def _serialize_checkin(document: dict) -> HealthCheckInResponse:
         risk_level=document.get("risk_level"),
         assessment_summary=document.get("assessment_summary"),
         assessed_at=document.get("assessed_at"),
+        classification=document.get("classification"),
+        assessment_model=document.get("assessment_model"),
     )
 
 
@@ -99,7 +101,6 @@ def _serialize_checkin(document: dict) -> HealthCheckInResponse:
 async def create_health_checkin(
     payload: HealthCheckInCreate,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
 ) -> HealthCheckInResponse:
     user_id = str(current_user["_id"])
@@ -140,10 +141,16 @@ async def create_health_checkin(
         "risk_level": None,
         "assessment_summary": None,
         "assessed_at": None,
+        "classification": None,
+        "assessment_model": None,
     }
 
     insert_result = await request.app.state.db["health_checkins"].insert_one(doc)
-    background_tasks.add_task(assess_and_store_checkin, request.app.state.db, insert_result.inserted_id)
+    await assess_and_store_checkin(
+        request.app.state.db,
+        insert_result.inserted_id,
+        request.app.state.settings.llm_api_key,
+    )
     stored = await request.app.state.db["health_checkins"].find_one({"_id": insert_result.inserted_id})
     if not stored:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store check-in")
@@ -211,6 +218,10 @@ async def get_health_trend(
             total_points=0,
             healthy_points=0,
             unhealthy_points=0,
+            low_risk_points=0,
+            moderate_risk_points=0,
+            high_risk_points=0,
+            avg_risk_score=None,
             latest_is_healthy=None,
             latest_risk_score=None,
             trend_direction="unknown",
@@ -218,6 +229,11 @@ async def get_health_trend(
 
     healthy_points = sum(1 for d in docs if d.get("is_healthy") is True)
     unhealthy_points = sum(1 for d in docs if d.get("is_healthy") is False)
+    low_risk_points = sum(1 for d in docs if d.get("risk_level") == "low")
+    moderate_risk_points = sum(1 for d in docs if d.get("risk_level") == "moderate")
+    high_risk_points = sum(1 for d in docs if d.get("risk_level") == "high")
+    numeric_scores = [int(d["risk_score"]) for d in docs if isinstance(d.get("risk_score"), int)]
+    avg_risk_score = round(sum(numeric_scores) / len(numeric_scores), 2) if numeric_scores else None
     latest = docs[0]
     oldest = docs[-1]
     latest_risk = latest.get("risk_score")
@@ -234,6 +250,10 @@ async def get_health_trend(
         total_points=len(docs),
         healthy_points=healthy_points,
         unhealthy_points=unhealthy_points,
+        low_risk_points=low_risk_points,
+        moderate_risk_points=moderate_risk_points,
+        high_risk_points=high_risk_points,
+        avg_risk_score=avg_risk_score,
         latest_is_healthy=latest.get("is_healthy"),
         latest_risk_score=latest_risk,
         trend_direction=trend_direction,

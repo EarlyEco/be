@@ -106,12 +106,18 @@ class HealthCheckInResponse(BaseModel):
     risk_level: str | None
     assessment_summary: str | None
     assessed_at: datetime | None
+    classification: dict | None
+    assessment_model: str | None
 
 
 class HealthTrendResponse(BaseModel):
     total_points: int
     healthy_points: int
     unhealthy_points: int
+    low_risk_points: int
+    moderate_risk_points: int
+    high_risk_points: int
+    avg_risk_score: float | None
     latest_is_healthy: bool | None
     latest_risk_score: int | None
     trend_direction: str
