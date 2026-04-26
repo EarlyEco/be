@@ -3,6 +3,7 @@ import asyncio
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -53,6 +54,19 @@ async def lifespan(app: FastAPI):
             await close_db_client(app.state.db_client)
 
 
+def _cors_allow_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    if origins:
+        return origins
+    return [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ]
+
+
 class MisconfigurationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith("/api") and not getattr(request.app.state, "ready", False):
@@ -67,6 +81,13 @@ class MisconfigurationMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(MisconfigurationMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_allow_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/", summary="Service status")
