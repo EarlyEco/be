@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     mongodb_db_name: str
     jwt_algorithm: str = "HS256"
     session_timeout_minutes: int = 60
+    llm_api_key: str | None = None
 
     model_config = SettingsConfigDict(
         env_file="environment.env",

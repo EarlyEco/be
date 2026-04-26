@@ -2,15 +2,17 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 
 from app.api.dependencies.auth import get_current_user
+from app.core.health_assessment import assess_and_store_checkin
 from app.schemas.user_health import (
     HealthCheckInCreate,
     HealthCheckInExposure,
     HealthCheckInResponse,
     HealthCheckInSymptomSeverities,
     HealthCheckInTesting,
+    HealthTrendResponse,
     HealthCheckInVitals,
     HealthCheckInWellness,
 )
@@ -80,6 +82,12 @@ def _serialize_checkin(document: dict) -> HealthCheckInResponse:
         chronic_conditions=list(document.get("chronic_conditions") or []),
         special_notices=document.get("special_notices"),
         recorded_at=recorded_at,
+        assessment_status=document.get("assessment_status", "pending"),
+        is_healthy=document.get("is_healthy"),
+        risk_score=document.get("risk_score"),
+        risk_level=document.get("risk_level"),
+        assessment_summary=document.get("assessment_summary"),
+        assessed_at=document.get("assessed_at"),
     )
 
 
@@ -91,6 +99,7 @@ def _serialize_checkin(document: dict) -> HealthCheckInResponse:
 async def create_health_checkin(
     payload: HealthCheckInCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
 ) -> HealthCheckInResponse:
     user_id = str(current_user["_id"])
@@ -125,9 +134,16 @@ async def create_health_checkin(
         "special_notices": payload.special_notices.strip() if payload.special_notices else None,
         "recorded_at": recorded_at,
         "created_at": now,
+        "assessment_status": "pending",
+        "is_healthy": None,
+        "risk_score": None,
+        "risk_level": None,
+        "assessment_summary": None,
+        "assessed_at": None,
     }
 
     insert_result = await request.app.state.db["health_checkins"].insert_one(doc)
+    background_tasks.add_task(assess_and_store_checkin, request.app.state.db, insert_result.inserted_id)
     stored = await request.app.state.db["health_checkins"].find_one({"_id": insert_result.inserted_id})
     if not stored:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store check-in")
@@ -174,6 +190,54 @@ async def list_health_checkins(
     async for document in cursor:
         results.append(_serialize_checkin(document))
     return results
+
+
+@router.get("/health-checkins/trend", response_model=HealthTrendResponse)
+async def get_health_trend(
+    request: Request,
+    current_user=Depends(get_current_user),
+    limit: int = Query(default=30, ge=3, le=200),
+) -> HealthTrendResponse:
+    user_id = str(current_user["_id"])
+    cursor = (
+        request.app.state.db["health_checkins"]
+        .find({"user_id": user_id, "risk_score": {"$ne": None}})
+        .sort("recorded_at", -1)
+        .limit(limit)
+    )
+    docs = [doc async for doc in cursor]
+    if not docs:
+        return HealthTrendResponse(
+            total_points=0,
+            healthy_points=0,
+            unhealthy_points=0,
+            latest_is_healthy=None,
+            latest_risk_score=None,
+            trend_direction="unknown",
+        )
+
+    healthy_points = sum(1 for d in docs if d.get("is_healthy") is True)
+    unhealthy_points = sum(1 for d in docs if d.get("is_healthy") is False)
+    latest = docs[0]
+    oldest = docs[-1]
+    latest_risk = latest.get("risk_score")
+    oldest_risk = oldest.get("risk_score")
+
+    trend_direction = "stable"
+    if isinstance(latest_risk, int) and isinstance(oldest_risk, int):
+        if latest_risk >= oldest_risk + 8:
+            trend_direction = "worsening"
+        elif latest_risk <= oldest_risk - 8:
+            trend_direction = "improving"
+
+    return HealthTrendResponse(
+        total_points=len(docs),
+        healthy_points=healthy_points,
+        unhealthy_points=unhealthy_points,
+        latest_is_healthy=latest.get("is_healthy"),
+        latest_risk_score=latest_risk,
+        trend_direction=trend_direction,
+    )
 
 
 @router.get("/health-checkins/{checkin_id}", response_model=HealthCheckInResponse)

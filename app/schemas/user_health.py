@@ -100,3 +100,18 @@ class HealthCheckInResponse(BaseModel):
     chronic_conditions: list[str]
     special_notices: str | None
     recorded_at: datetime
+    assessment_status: str
+    is_healthy: bool | None
+    risk_score: int | None
+    risk_level: str | None
+    assessment_summary: str | None
+    assessed_at: datetime | None
+
+
+class HealthTrendResponse(BaseModel):
+    total_points: int
+    healthy_points: int
+    unhealthy_points: int
+    latest_is_healthy: bool | None
+    latest_risk_score: int | None
+    trend_direction: str
