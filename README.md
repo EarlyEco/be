@@ -42,6 +42,10 @@ uvicorn app.main:app --reload
 - `POST /api/v1/auth/signup` - register user (email, password, first name, last name, permanent address; no token)
 - `POST /api/v1/auth/signin` - authenticate user and return Bearer token
 - `GET /api/v1/auth/me` - get current user (requires Bearer token)
+- `POST /api/v1/users/self/health-checkins` - store a frequent health check-in (requires Bearer token)
+- `GET /api/v1/users/self/health-checkins/latest` - fetch latest check-in (requires Bearer token)
+- `GET /api/v1/users/self/health-checkins` - list recent check-ins (optional `since`/`until`, requires Bearer token)
+- `GET /api/v1/users/self/health-checkins/{checkin_id}` - fetch one check-in (requires Bearer token)
 
 ## Deploy on Vercel
 
